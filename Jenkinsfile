@@ -11,7 +11,7 @@ pipeline {
 
   stage('Load Image to Kind') {
    steps {
-    sh 'kind load docker-image demo-app:$BUILD_NUMBER'
+    sh 'kind load docker-image demo-app:$BUILD_NUMBER' --name dev-cluster
    }
   }
 
