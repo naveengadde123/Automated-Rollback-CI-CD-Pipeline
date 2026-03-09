@@ -1,53 +1,46 @@
 pipeline {
-    agent any
+ agent any
 
-    stages {
+ stages {
 
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
+  stage('Build Image') {
+   steps {
+    sh 'docker build -t demo-app:$BUILD_NUMBER .'
+   }
+  }
 
-        stage('Build Image') {
-            steps {
-                sh 'docker build -t demo-app:${BUILD_NUMBER} .'
-            }
-        }
+  stage('Load Image to Kind') {
+   steps {
+    sh 'kind load docker-image demo-app:$BUILD_NUMBER --name dev-cluster'
+   }
+  }
 
-        stage('Load Image to Kind') {
-            steps {
-                sh 'kind load docker-image demo-app:${BUILD_NUMBER} --name dev-cluster'
-            }
-        }
+  stage('Deploy If Not Exists') {
+   steps {
+    sh 'kubectl apply -f deployment.yaml'
+   }
+  }
 
-        stage('Deploy to Kubernetes') {
-            steps {
-                sh '''
-                kubectl set image deployment/demo-app \
-                demo-container=demo-app:${BUILD_NUMBER} --record
-                '''
-            }
-        }
+  stage('Update Image') {
+   steps {
+    sh '''
+    kubectl set image deployment/demo-app \
+    demo-container=demo-app:$BUILD_NUMBER
+    '''
+   }
+  }
 
-        stage('Verify Deployment') {
-            steps {
-                sh 'kubectl rollout status deployment/demo-app'
-            }
-        }
+  stage('Verify Deployment') {
+   steps {
+    sh 'kubectl rollout status deployment/demo-app'
+   }
+  }
 
-    }
+ }
 
-    post {
-        failure {
-            echo "Deployment failed. Rolling back..."
-            sh '''
-            if kubectl get deployment demo-app > /dev/null 2>&1; then
-                kubectl rollout undo deployment/demo-app
-            else
-                echo "Deployment not found, skipping rollback"
-            fi
-            '''
-        }
-    }
+ post {
+  failure {
+   sh 'kubectl rollout undo deployment/demo-app'
+  }
+ }
 }
